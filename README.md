@@ -21,11 +21,12 @@ MEMORY_QUOTA = 20480
 ## Usage
 
 ```
-USAGE: locopod.py [-q] [-u <uri> | -p <uri> | -b <uri> | -s | -f <amount>] [-c <cacheDir>] [-l <user>] [-k <password_file>] [-w]
+USAGE: locopod.py [-q] [-u <uri> | -p <uri> | -b <uri> | -s | -f <amount> | -d <directory>] [-c <cacheDir>] [-l <user>] [-k <password_file>] [-w]
     -u - Pull a resource from the remote URI.
     -p - Push a local resource to the remote URI.
     -s - Query the available space on the cache directory's file system (in bytes).
     -f - Free the specified amount of space (in bytes).
+    -d - List the contents of <directory> (can be an URI or local directory).
     -c - Specify the cache directory to use.
     -q - Run the program in quiet mode.
     -l - Specify the username on the remote host.
