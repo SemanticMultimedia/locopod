@@ -7,7 +7,12 @@ This is a ...
 
 """
 
-import sys, os, getopt, subprocess, socket
+import sys
+import os
+import getopt
+import subprocess
+import socket
+import re
 from functools import partial
 from ConfigParser import RawConfigParser
 
@@ -25,12 +30,13 @@ MEMORY_QUOTA = 0 # in MB. 0 means: no limit.
 GLOBAL_VARS = ["CACHE_DIR", "USERNAME", "PASSWORD_FILE", "QUIET", "HOST_IP", "WEAK_ENCRYPTION", "MEMORY_QUOTA"]
 
 def print_usage():
-	print 'USAGE: locopod.py [-q] [-u <uri> | -p <uri> | -b <uri> | -s | -f <amount>]'
+	print 'USAGE: locopod.py [-q] [-u <uri> | -p <uri> | -b <uri> | -s | -f <amount> | -d <directory>]'
 	print '\t\t[-c <cacheDir>] [-l <user>] [-k <password_file>] [-w]\n'
 	print '\t-u\t-\tPull a resource from the remote URI.'
 	print '\t-p\t-\tPush a local resource to the remote URI.'	
 	print '\t-s\t-\tQuery the available space on the cache directory\'s file system (in bytes).'
 	print '\t-f\t-\tFree the specified amount of space (in bytes).'
+	print '\t-d\t-\tList the contents of <directory> (can be an URI or local directory).'
 	print '\t-c\t-\tSpecify the cache directory to use.'
 	print '\t-q\t-\tRun the program in quiet mode.'
 	print '\t-l\t-\tSpecify the username on the remote host.'
@@ -119,6 +125,9 @@ def choose_operation(opts):
 		elif opt in ("-f", "--free"):
 			operation = free_space
 			params = [CACHE_DIR, int(opts[opt])]
+		elif opt in ("-d", "--dir"):
+			operation = list_dir
+			params = [opts[opt]]
 	
 	return operation, params
 
@@ -129,7 +138,7 @@ def main(argv):
 		sys.exit(1)
 
 	try:
-		opts, _ = getopt.getopt(argv,"qhp:sf:u:b:c:l:k:w",["push=", "space", "free=", "uri=", "cacheDir=", "basePath="])
+		opts, _ = getopt.getopt(argv,"qhp:sf:d:u:b:c:l:k:w",["push=", "space", "free=", "dir=", "uri=", "cacheDir=", "basePath="])
 	except getopt.GetoptError:
 	  	print_usage()
 	  	sys.exit(2)
@@ -218,11 +227,24 @@ def enforce_memory_quota():
 		free_space(CACHE_DIR, free * conversion)
 	
 
+def list_dir(directory):
+	if directory[-1] != "/":
+		directory += "/"
+
+	if USERNAME:
+		directory = "%s@%s" % (USERNAME, directory)
+
+	file_list = query_files(directory).split("\n")
+	list_regex = re.compile("[a-z-]+\s+\d+\s+[\d/]+\s+[\d:]+\s+(.+)")
+	files = [list_regex.match(filename).group(1) for filename in file_list if list_regex.match(filename)]
+	return "\n".join(files)
+
+
 def push(remote):
 	"""
 	Pushes changed resources from the local cache to the remote resource.
 
-	Expects remote to be a URI of the form 'host:/absolute/path/' and
+	Expects remote to be a URI of the form 'host::module/absolute/path/' and
 	will synchronize the directory 'CACHE_DIR/host_ip/absolute/path' if it exists.
 	"""	
 
@@ -238,7 +260,7 @@ def push(remote):
 		print_debug("There is no cached directory.")
 		return False
 
-	# this is needed in case the remote URI doesn't contain a trialing slash
+	# this is needed in case the remote URI doesn't contain a trailing slash
 	local += os.path.basename(remote)
 
 	if USERNAME:
@@ -302,18 +324,29 @@ def base_path(remote):
 	return cache_dir + filename
 
 
-def sync_files(src, dest):
-	
+def prepare_command(quiet):
 	if PASSWORD_FILE:
 		# Private-Key authentication
-		cmd  = ["rsync", "-OrLptgoDz", "--password-file=%s" % PASSWORD_FILE, src, dest]
+		cmd  = ["rsync", "-OrLptgoDz", "--password-file=%s" % PASSWORD_FILE]
 	else:
 		# Username and password authentication
-		cmd  = ["rsync", "-OrLptgoDz", src, dest]
+		cmd  = ["rsync", "-OrLptgoDz"]
 	
-	if QUIET:
+	if quiet:
 		cmd.insert(1, "-q")
+	return cmd
 
+
+def query_files(src):
+	cmd = prepare_command(False)
+	cmd.append(src)
+	print_debug(cmd)
+	return execute_communicate( cmd )
+
+
+def sync_files(src, dest):
+	cmd = prepare_command(QUIET)
+	cmd += [src, dest]
 	print_debug(cmd)
 	return execute( cmd )
 
@@ -362,6 +395,11 @@ def modification_time(directory, f):
 def execute(cmd):
 	proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE);
 	return proc.wait()
+
+def execute_communicate(cmd):
+	proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE);
+	return proc.communicate()[0]
+
 
 if __name__ == "__main__":
    	main(sys.argv[1:])
