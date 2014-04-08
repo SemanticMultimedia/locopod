@@ -18,6 +18,29 @@ PASSWORD_FILE = ./rsync.password
 MEMORY_QUOTA = 20480
 ```
 
+### rsyncdemon
+
+In case you decide for rsyncdemon username:password authentification put the secret password in the PASSWORD_FILE (default, can be overwritten with -k option). rsyncdemon needs to be configured as follows.
+
+The main config (/etc/rsyncd.conf) should contain:
+```
+# Locopod uses the Folder [root]
+[root]
+    path = /
+    comment = Root
+    uid = rsync_user
+    gid = rsync_group
+    read only = no
+    list = yes
+    auth users = rsyncclient
+    secrets file = /etc/rsyncd.secrets
+    use chroot = no
+```
+
+Set rsync\_user and rsync\_group according your access policy. rsync\_user will be the owner of synced files. Put the secret password in /etc/rsyncd.secrets.
+
+Start the rsync demon.
+
 ## Usage
 
 ```
