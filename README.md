@@ -1,4 +1,4 @@
-locopod
+<img src="./locopod.png" alt="locopod" width="256">
 =======
 
 LOcal COPy On Demand - a convenient wrapper for rsync
